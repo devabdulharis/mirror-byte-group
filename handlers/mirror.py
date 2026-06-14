@@ -93,7 +93,9 @@ async def process_mirror(update: Update, context: ContextTypes.DEFAULT_TYPE, pla
 
 
 async def show_mirror_results(message, context: ContextTypes.DEFAULT_TYPE, results: list):
-    """Tampilkan hasil mirroring"""
+    """Tampilkan hasil mirroring — kirim pesan BARU dengan link klikable"""
+    bot = context.bot
+    chat_id = message.chat_id
     from html import escape
 
     text = "✅ <b>Mirror Selesai!</b>\n\n"
@@ -105,25 +107,35 @@ async def show_mirror_results(message, context: ContextTypes.DEFAULT_TYPE, resul
         for platform, result in file_result['mirrors'].items():
             if result.get('success'):
                 icon = {'telegram': '📱', 'gdrive': '☁️', 'gofile': '📂', 'terabox': '📦'}.get(platform, '🔗')
+                link = result.get('link', '')
 
                 if platform == 'telegram':
-                    text += f"{icon} Telegram: ✅ Uploaded\n"
-                elif platform == 'gdrive':
-                    link = result.get('link', '')
                     if link:
                         safe_link = escape(link)
-                        text += f'{icon} GDrive: <a href="{safe_link}">Buka Link</a>\n'
+                        text += f'{icon} Telegram: <a href="{safe_link}">📱 Buka di Telegram</a>\n'
+                    else:
+                        text += f"{icon} Telegram: ✅ (private chat — link tidak tersedia)\n"
+
+                elif platform == 'gdrive':
+                    if link:
+                        safe_link = escape(link)
+                        text += f'{icon} GDrive: <a href="{safe_link}">☁️ Buka di Google Drive</a>\n'
                     else:
                         text += f"{icon} GDrive: ✅\n"
+
                 elif platform == 'gofile':
-                    link = result.get('link', '')
                     if link:
                         safe_link = escape(link)
-                        text += f'{icon} GoFile: <a href="{safe_link}">Download</a>\n'
+                        text += f'{icon} GoFile: <a href="{safe_link}">📂 Download dari GoFile</a>\n'
                     else:
                         text += f"{icon} GoFile: ✅\n"
+
                 elif platform == 'terabox':
-                    text += f"{icon} Terabox: ✅ {escape(str(result.get('path', '')))}\n"
+                    if link:
+                        safe_link = escape(link)
+                        text += f'{icon} Terabox: <a href="{safe_link}">📦 Buka di Terabox</a>\n'
+                    else:
+                        text += f"{icon} Terabox: ✅ {escape(str(result.get('path', '')))}\n"
             else:
                 text += f"❌ {platform}: {escape(str(result.get('error', 'Unknown error')))}\n"
 
@@ -137,9 +149,20 @@ async def show_mirror_results(message, context: ContextTypes.DEFAULT_TYPE, resul
     # Simpan mirror results ke context
     context.user_data['mirror_results'] = results
 
-    await message.edit_text(
-        text,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode=ParseMode.HTML,
-        disable_web_page_preview=True
-    )
+    # Kirim pesan BARU dengan hasil — jangan edit pesan progress
+    try:
+        await bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True
+        )
+    except Exception as e:
+        # Fallback: edit pesan lama kalau send_message gagal
+        await message.edit_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True
+        )

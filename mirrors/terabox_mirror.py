@@ -224,6 +224,15 @@ async def _upload_official(file_path: str, remote_path: str,
                 fs_id = create_result.get("fs_id", "")
                 log.info(f"{LOG_PREFIX} Upload BERHASIL! fs_id={fs_id}, path={full_remote}")
 
+                # ===== FASE 4: CREATE SHARE LINK ===========================
+                share_url = ""
+                try:
+                    share_url = await _create_share_link(session, full_remote, str(fs_id),
+                                                         js_token, bdstoken, devuid, log)
+                except Exception as e:
+                    log.warning(f"{LOG_PREFIX} Gagal create share link: {e}")
+                    # Tidak raise error — share link opsional
+
                 return {
                     "success": True,
                     "platform": "terabox",
@@ -231,12 +240,82 @@ async def _upload_official(file_path: str, remote_path: str,
                     "fs_id": str(fs_id),
                     "uploadid": upload_id,
                     "md5": create_result.get("md5", ""),
+                    "link": share_url,  # <-- link publik untuk user
                     "method": "official",
                 }
 
     except Exception as e:
         log.error(f"{LOG_PREFIX} Upload gagal: {e}")
         raise
+
+
+async def _create_share_link(session: aiohttp.ClientSession, remote_path: str, fs_id: str,
+                              js_token: str, bdstoken: str, devuid: str,
+                              log) -> str:
+    """
+    Buat share link publik untuk file yang baru diupload.
+    Endpoint: POST /share/pset (persis seperti request browser)
+    """
+    qs = {
+        "app_id": "250528",
+        "web": "1",
+        "channel": "dubox",
+        "clienttype": "0",
+        "jsToken": js_token,
+        "bdstoken": bdstoken or "",
+        "from": "",
+    }
+    form_data = {
+        "schannel": "0",
+        "channel_list": json.dumps([0]),
+        "period": "0",
+        "path_list": json.dumps([remote_path]),
+        "fid_list": json.dumps([int(fs_id)]) if fs_id and fs_id != "0" else "[]",
+        "pwd": "",
+        "public": "1",
+        "scene": "",
+    }
+    headers = {
+        "User-Agent": TERABOX_UA,
+        "Cookie": Config.TERABOX_COOKIE or "",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Origin": "https://dm.terabox.com",
+        "Referer": f"https://dm.terabox.com/indonesian/main?category=all&path={remote_path.rsplit('/', 1)[0]}",
+        "X-Requested-With": "XMLHttpRequest",
+    }
+
+    async with session.post(
+        f"{API_BASE}/share/pset",
+        params=qs,
+        data=form_data,
+        headers=headers,
+    ) as resp:
+        if resp.status != 200:
+            raise Exception(f"HTTP {resp.status}")
+
+        text = await resp.text()
+        result = json.loads(text)
+        log.debug(f"{LOG_PREFIX} share/pset response: {json.dumps(result)[:300]}")
+
+        if result.get("errno", -1) != 0:
+            raise Exception(f"errno={result.get('errno')} msg={result.get('errmsg', '?')}")
+
+        # Share link dari respons — bisa berupa kode atau URL penuh
+        raw = result.get("shorturl", "")
+        if not raw:
+            data = result.get("data", [])
+            if data:
+                raw = data[0].get("shorturl", "")
+
+        if raw:
+            if raw.startswith("http"):
+                url = raw  # sudah URL penuh
+            else:
+                url = f"https://1024terabox.com/s/{raw}"
+            log.info(f"{LOG_PREFIX} Share link: {url}")
+            return url
+
+        return ""
 
 
 # ===========================================================================
