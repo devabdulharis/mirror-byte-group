@@ -491,8 +491,14 @@ def main():
     from utils.helpers import ensure_download_dir
     ensure_download_dir()
 
+    # Periodic cleanup background task — jalan di loop polling via post_init
+    async def _post_init(app):
+        from utils.cleanup import periodic_cleanup
+        app.create_task(periodic_cleanup())
+        logger.info("Periodic cleanup task scheduled")
+
     # Build application
-    application = Application.builder().token(Config.BOT_TOKEN).build()
+    application = Application.builder().token(Config.BOT_TOKEN).post_init(_post_init).build()
 
     # ── Command handlers ──────────────────────────────────────────────
     # Info & Help
@@ -542,12 +548,6 @@ def main():
         filters.TEXT & ~filters.COMMAND,
         message_handler
     ))
-
-    # Periodic cleanup background task
-    loop = asyncio.get_event_loop()
-    from utils.cleanup import periodic_cleanup
-    loop.create_task(periodic_cleanup())
-    logger.info("Periodic cleanup task scheduled")
 
     # Error handler
     application.add_error_handler(error_handler)
