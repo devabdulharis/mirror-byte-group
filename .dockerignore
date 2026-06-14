@@ -1,0 +1,19 @@
+# Docker
+.git
+.gitignore
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+*.db
+bot.db
+downloads/
+downloadss/
+logs/
+*.log
+*.service
+deploy.sh
+README.md
+analysis-terabox.md
+test_*.py

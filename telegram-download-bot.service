@@ -1,0 +1,37 @@
+[Unit]
+Description=Telegram Download Bot
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=haris_id
+WorkingDirectory=/home/haris_id/Repository/telegram-download-bot
+
+# Environment file
+EnvironmentFile=/home/haris_id/Repository/telegram-download-bot/.env
+
+# Exec start
+ExecStart=/home/haris_id/Repository/telegram-download-bot/.venv/bin/python bot.py
+
+# Auto restart
+Restart=always
+RestartSec=10
+
+# Resource limits
+CPUQuota=100%
+MemoryMax=1G
+
+# Logging
+StandardOutput=append:/home/haris_id/Repository/telegram-download-bot/logs/bot.log
+StandardError=append:/home/haris_id/Repository/telegram-download-bot/logs/bot-error.log
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/home/haris_id/Repository/telegram-download-bot/downloads
+ReadWritePaths=/home/haris_id/Repository/telegram-download-bot/logs
+ReadWritePaths=/home/haris_id/Repository/telegram-download-bot
+
+[Install]
+WantedBy=multi-user.target
